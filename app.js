@@ -1,62 +1,145 @@
 const express = require("express");
+const fs = require("fs")
 
 const PORT = 4000;
 
+const app = express();
+app.use(express.json()) // for parsing application/json
+// app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
+
+// Importing all the pokemon for our data file
 const allPokemon = require("./data");
 
-const app = express();
-app.use(express.json())
+
+// -- Define your helper functions & objects here! --
+
+const filterByTypes  = (pokemonList) => {
+    const pokemonTypes = []
+    pokemonList.filter( (pkmn) => {
+        const types = pkmn.types
+        if(types.length !== 0){
+            types.forEach(element => {
+                if(!pokemonTypes.includes(element)){
+                    pokemonTypes.push(element)
+                }
+            });
+        }
+    } )
+    return pokemonTypes
+}
+const pokemonTypes = filterByTypes(allPokemon)
+
+const getPokemonById = (id) => {
+    const pokemonArray = allPokemon.filter( (pkmn) => {
+        return id === pkmn.id })
+    return pokemonArray[0]
+}
+const getPokemonByTypes = (type) => {
+    let pokemonsByType = []
+    pokemonsByType = allPokemon.filter( (pkmn) => {
+        return pkmn.types.includes(type)
+    } )
+    return pokemonsByType
+}
+const getPokemonByName = (name) => {
+    const pokemonArray = allPokemon.filter( (pkmn) => {
+        return name === pkmn.name 
+    })
+    return pokemonArray[0]
+}
+const getPokemonIndexById = (id) => {
+    let index = -1
+    allPokemon.forEach( (pokemon, i) => {
+        if(pokemon.id === id){
+            index = i
+            return index
+        }
+    })
+    return index
+}
 
 
 // -- Define your route listeners here! --
 
-app.get('/pokemon', (req, res) => {
-    console.log(req)
-    res.send(allPokemon)
+// GET /pokemon 
+app.get('/pokemon',(req,res,next)=>{
+    console.log('in get /')
+    res.json(allPokemon)
 })
 
-app.get('/pokemon/:id', (req, res) => {
-    const { id } = req.params
-    res.send(allPokemon[id])
+// GET /pokemon/:id 
+app.get('/pokemon/:id',(req,res,next)=>{
+    const id = parseInt(req.params.id)
+    res.json(getPokemonById(id))
 })
 
-
-app.get('/search', (req, res) => {
-    const pokemonName = req.query["name"]
-    const pokemonType = req.query["type"]
-
-    const foundPokemon = allPokemon.find(pokemon => pokemon.name === pokemonName)
-    let pokemonArray = []
-
-    allPokemon.map(pokemon => {
-        if (pokemon.types.includes(pokemonType)) {
-            pokemonArray.push(poke)
-            return pokemonArray
+// GET /search 
+app.get('/search/:searchTerm', (req,res,next) => {
+    const searchTerm = req.params.searchTerm
+    if(searchTerm !== ''){
+        if(pokemonTypes.includes(searchTerm)){ // search by type
+            res.json(getPokemonByTypes(searchTerm))
+        }else{ // search by name
+            res.json(getPokemonByName(searchTerm))
         }
-    })
-
-    if (pokemonName === undefined) {
-        res.send(pokemonArray)
-    } else if (pokemonType === undefined) {
-        res.send(foundPokemon)
+    }else{
+        console.log('Search term is empty!')
     }
 })
 
-app.post('/pokemon', (req, res) => {
-    let body = req.body
-    allPokemon.push(body)
-    res.send(body)
+// POST /pokemon
+app.post('/pokemon',(req, res, next)=>{
+    const name = req.body.name
+    if(getPokemonByName(name) === undefined){
+        const id = allPokemon.length
+        const pokemon = req.body
+        pokemon.id = id
+        allPokemon.push(pokemon)
+        res.json({
+            suceess: "New pokemon added",
+            id: allPokemon.length
+        })
+    }else{
+        res.json({
+            Error: "Pokemon already exists"
+        })
+    }
 })
 
-app.put('/pokemon/:id', (req, res) => {
-    const { id } = req.params
-    let body = req.body
-    res.send(allPokemon[id] = body)
+// PUT /pokemon/:id
+app.put('/pokemon/:id',(req,res,next)=>{
+    const id = parseInt(req.params.id)
+    const index = getPokemonIndexById(id)
+    if(index !== -1){
+        const updatedPokemon = req.body
+        updatedPokemon.id = id
+        allPokemon[index] = updatedPokemon
+        res.json({
+            Success: "Pokemon details updated",
+        })
+    }else{
+        res.json({
+            Error: "Pokemon does not exist"
+        })
+    }
+    
 })
 
-app.delete('/pokemon/:id', (req, res) => {
-    const { id } = req.params
-    res.send(allPokemon[id])
+// DELETE /pokemon/:id
+app.delete('/pokemon/:id',(req,res,next)=>{
+    const id = parseInt(req.params.id)
+    const index = getPokemonIndexById(id)
+    if(index !== -1){
+        allPokemon.splice(index,1)
+        res.json({
+            Success: "Pokemon deleted"
+        })
+    }else{
+        res.json({
+            Error: "Pokemon does not exist"
+        })
+    }
+    
 })
 
 app.listen(PORT, () => console.log(`Server up and running at port ${PORT}`));
